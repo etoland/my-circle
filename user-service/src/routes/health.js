@@ -11,5 +11,4 @@ router.get('/', (req, res) => {
   });
 });
 
-module.exports = router;
-// trigger
+module.exports = router;// trigger
