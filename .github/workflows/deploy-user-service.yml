@@ -57,7 +57,7 @@ jobs:
 
       - name: Inject new image into task definition
         id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        uses: aws-actions/amazon-ecs-render-task-definition@v1.4.0
         with:
           task-definition: task-definition.json
           container-name: ${{ env.CONTAINER_NAME }}
