@@ -7,7 +7,7 @@ on:
       - 'user-service/**'
 
 env:
-  AWS_REGION: eu-north-1
+  AWS_REGION: us-east-1
   ECR_REPOSITORY: my-circle-user-service
   ECS_SERVICE: my-circle-user-service
   ECS_CLUSTER: my-circle-cluster
@@ -53,7 +53,8 @@ jobs:
         run: |
           aws ecs describe-task-definition \
             --task-definition ${{ env.ECS_SERVICE }} \
-            --query taskDefinition > task-definition.json
+            --query taskDefinition \
+          | jq 'del(.enableFaultInjection)' > task-definition.json
 
       - name: Inject new image into task definition
         id: task-def
