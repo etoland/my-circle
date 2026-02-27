@@ -7,7 +7,7 @@ on:
       - 'user-service/**'
 
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: eu-north-1
   ECR_REPOSITORY: my-circle-user-service
   ECS_SERVICE: my-circle-user-service
   ECS_CLUSTER: my-circle-cluster
