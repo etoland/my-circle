@@ -1,0 +1,12 @@
+node_modules/
+.env
+*.env.local
+.DS_Store
+dist/
+build/
+coverage/
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform.lock.hcl
