@@ -10,3 +10,4 @@ coverage/
 *.tfstate.backup
 *.tfvars
 .terraform.lock.hcl
+*.pkg
