@@ -11,7 +11,7 @@ terraform {
   # backend "s3" {
   #   bucket = "my-circle-terraform-state"
   #   key    = "infra/terraform.tfstate"
-  #   region = "us-east-1"
+  #   region = "eu-north-1"
   # }
 }
 
@@ -21,7 +21,7 @@ provider "aws" {
 
 # ── Variables ───────────────────────────────────────────
 variable "aws_region" {
-  default = "us-east-1"
+  default = "eu-north-1"
 }
 
 variable "app_name" {
@@ -103,28 +103,41 @@ resource "aws_dynamodb_table" "messages" {
   }
 }
 
-# ── Neptune cluster ─────────────────────────────────────
-# Commented out until Phase 2 — Neptune is expensive to leave running
-# Uncomment when you're ready to build the match-service
+# ── Neptune cluster (Serverless v2) ─────────────────────
+resource "aws_neptune_cluster" "main" {
+  cluster_identifier  = "${var.app_name}-graph"
+  engine              = "neptune"
+  engine_version      = "1.3.0.0"
+  skip_final_snapshot = true
+  apply_immediately   = true
 
-# resource "aws_neptune_cluster" "main" {
-#   cluster_identifier = "${var.app_name}-graph"
-#   engine             = "neptune"
-#   skip_final_snapshot = true
-#   apply_immediately  = true
-#
-#   tags = {
-#     App = var.app_name
-#     Env = var.environment
-#   }
-# }
+  serverless_v2_scaling_configuration {
+    min_capacity = 1.0
+    max_capacity = 8.0
+  }
 
-# resource "aws_neptune_cluster_instance" "main" {
-#   cluster_identifier = aws_neptune_cluster.main.id
-#   instance_class     = "db.t3.medium"   # cheapest option for dev
-#   engine             = "neptune"
-#   apply_immediately  = true
-# }
+  tags = {
+    App = var.app_name
+    Env = var.environment
+  }
+}
+
+resource "aws_neptune_cluster_instance" "main" {
+  cluster_identifier = aws_neptune_cluster.main.id
+  instance_class     = "db.serverless"
+  engine             = "neptune"
+  apply_immediately  = true
+
+  tags = {
+    App = var.app_name
+    Env = var.environment
+  }
+}
+
+output "neptune_endpoint" {
+  value       = aws_neptune_cluster.main.endpoint
+  description = "Use this in match-service NEPTUNE_ENDPOINT env var"
+}
 
 # ── Outputs ─────────────────────────────────────────────
 output "ecr_repository_url" {

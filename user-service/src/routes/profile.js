@@ -5,10 +5,41 @@ const AWS = require('aws-sdk');
 const verifyToken = require('../middleware/verifyToken');
 
 const dynamo = new AWS.DynamoDB.DocumentClient({
-  region: process.env.AWS_REGION || 'us-east-1',
+  region: process.env.AWS_REGION || 'eu-north-1',
 });
 
 const TABLE = process.env.DYNAMO_USERS_TABLE || 'my-circle-users';
+
+// ── Interest schema ─────────────────────────────────────
+// Hierarchical interest structure:
+// {
+//   category: "Music",
+//   subcategory: "Alternative Rock",      // optional
+//   specific: "Smashing Pumpkins",        // optional
+//   weight: 3                             // 1=category, 2=subcategory, 3=specific
+// }
+
+function normaliseInterests(interests) {
+  return interests.map(interest => {
+    // Support both flat strings (legacy) and hierarchical objects
+    if (typeof interest === 'string') {
+      return {
+        category: interest,
+        subcategory: null,
+        specific: null,
+        weight: 1,
+      };
+    }
+
+    const weight = interest.specific ? 3 : interest.subcategory ? 2 : 1;
+    return {
+      category: interest.category,
+      subcategory: interest.subcategory || null,
+      specific: interest.specific || null,
+      weight,
+    };
+  });
+}
 
 // ── GET /profile/me ─────────────────────────────────────
 router.get('/me', verifyToken, async (req, res, next) => {
@@ -28,16 +59,21 @@ router.get('/me', verifyToken, async (req, res, next) => {
 });
 
 // ── POST /profile/onboard ───────────────────────────────
-// Called after registration to collect interests, school, etc.
-// This data will also be written to Neptune by the match-service
 router.post(
   '/onboard',
   verifyToken,
   [
-    body('displayName').notEmpty(),
-    body('interests').isArray({ min: 1 }).withMessage('At least 1 interest required'),
+    body('displayName').notEmpty().withMessage('Display name required'),
+    body('interests')
+      .isArray({ min: 1 })
+      .withMessage('At least 1 interest required'),
+    body('interests.*.category')
+      .optional()
+      .isString()
+      .withMessage('Interest category must be a string'),
     body('school').optional().isString(),
     body('location').optional().isObject(),
+    body('bio').optional().isString(),
   ],
   async (req, res, next) => {
     const errors = validationResult(req);
@@ -45,15 +81,18 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { displayName, interests, school, location } = req.body;
+    const { displayName, interests, school, location, bio } = req.body;
+
+    const normalisedInterests = normaliseInterests(interests);
 
     const profile = {
       userId: req.userId,
       displayName,
-      interests,
+      interests: normalisedInterests,
       school: school || null,
       location: location || null,
-      communicationFingerprint: {},   // populated later by speech-service
+      bio: bio || null,
+      communicationFingerprint: {},
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -63,10 +102,47 @@ router.post(
         .put({ TableName: TABLE, Item: profile })
         .promise();
 
-      // TODO: emit an event to match-service to write this user into Neptune graph
-      // This will be wired up via SQS in Phase 2
-
       res.status(201).json({ message: 'Profile created', profile });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ── PUT /profile/interests ──────────────────────────────
+// Add or update interests after onboarding
+router.put(
+  '/interests',
+  verifyToken,
+  [
+    body('interests')
+      .isArray({ min: 1 })
+      .withMessage('At least 1 interest required'),
+  ],
+  async (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { interests } = req.body;
+    const normalisedInterests = normaliseInterests(interests);
+
+    try {
+      await dynamo.update({
+        TableName: TABLE,
+        Key: { userId: req.userId },
+        UpdateExpression: 'SET interests = :interests, updatedAt = :updatedAt',
+        ExpressionAttributeValues: {
+          ':interests': normalisedInterests,
+          ':updatedAt': new Date().toISOString(),
+        },
+      }).promise();
+
+      res.status(200).json({
+        message: 'Interests updated',
+        interests: normalisedInterests,
+      });
     } catch (err) {
       next(err);
     }
