@@ -103,11 +103,44 @@ resource "aws_dynamodb_table" "messages" {
   }
 }
 
+# ── DynamoDB — Vouches table ────────────────────────────
+resource "aws_dynamodb_table" "vouches" {
+  name         = "${var.app_name}-vouches"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "vouchId"
+
+  attribute {
+    name = "vouchId"
+    type = "S"
+  }
+
+  # GSI to query vouches by userId
+  global_secondary_index {
+    name            = "fromUserId-index"
+    hash_key        = "fromUserId"
+    projection_type = "ALL"
+  }
+
+  attribute {
+    name = "fromUserId"
+    type = "S"
+  }
+
+  tags = {
+    App = var.app_name
+    Env = var.environment
+  }
+}
+
+output "vouches_table_name" {
+  value = aws_dynamodb_table.vouches.name
+}
+
 # ── Neptune cluster (Serverless v2) ─────────────────────
 resource "aws_neptune_cluster" "main" {
   cluster_identifier  = "${var.app_name}-graph"
   engine              = "neptune"
-  engine_version      = "1.3.0.0"
+  engine_version      = "1.3.2.1"
   skip_final_snapshot = true
   apply_immediately   = true
 

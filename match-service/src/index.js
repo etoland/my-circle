@@ -5,9 +5,10 @@ const helmet = require('helmet');
 const matchRoutes = require('./routes/matches');
 const seedRoutes = require('./routes/seed');
 const healthRoutes = require('./routes/health');
+const vouchRoutes = require('./routes/vouch');
 
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3003;
 
 app.use(helmet());
 app.use(cors());
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use('/health', healthRoutes);
 app.use('/matches', matchRoutes);
 app.use('/seed', seedRoutes);
+app.use('/vouch', vouchRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
