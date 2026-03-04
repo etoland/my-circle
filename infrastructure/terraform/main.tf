@@ -185,3 +185,23 @@ output "ecs_cluster_name" {
 output "users_table_name" {
   value = aws_dynamodb_table.users.name
 }
+
+# ── ECR Repository (match-service) ──────────────────────
+resource "aws_ecr_repository" "match_service" {
+  name                 = "${var.app_name}-match-service"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    App = var.app_name
+    Env = var.environment
+  }
+}
+
+output "match_service_ecr_url" {
+  value       = aws_ecr_repository.match_service.repository_url
+  description = "Push your match-service Docker image here"
+}
